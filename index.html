@@ -3,449 +3,694 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#100c17">
 <title>David y el Castillo de los Gatos</title>
 <style>
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  background: #100d18;
-  color: #f4e9d0;
-  font-family: monospace;
-  text-align: center;
+*{box-sizing:border-box}
+:root{--gold:#d7ad68;--dark:#100c17;--panel:#211725;--cream:#f1dfbc}
+body{
+  margin:0;background:var(--dark);color:var(--cream);
+  font-family:monospace;text-align:center;
+  -webkit-user-select:none;user-select:none
 }
-h1 { color: #e9c77b; font-size: 22px; }
-#game {
-  display: block;
-  width: 100%;
-  max-width: 800px;
-  margin: auto;
-  background: #21182b;
-  image-rendering: pixelated;
-  border: 3px solid #8b6c91;
-  touch-action: none;
-}
-.controls {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px;
-}
-button {
-  background: #382844;
-  border: 2px solid #e9c77b;
-  color: white;
-  padding: 14px;
-  font: bold 15px monospace;
-  border-radius: 5px;
-  touch-action: manipulation;
-}
-p { color: #c7b8d3; font-size: 13px; }
+header{padding:10px 8px 5px}
+h1{font-size:clamp(15px,3vw,23px);letter-spacing:2px;color:#e9c98a;margin:5px}
+header p{font-size:11px;color:#b9a9c1;margin:5px}
+#frame{width:100%;max-width:960px;margin:auto;background:#100c17;border:2px solid #72523e;box-shadow:0 0 30px #38213d}
+#game{width:100%;height:auto;display:block;image-rendering:pixelated;touch-action:none}
+#controls{max-width:960px;margin:auto;padding:9px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+button{min-height:49px;padding:7px 2px;background:#211725;color:#f1dfbc;border:2px solid #a77c50;border-radius:5px;font:bold clamp(9px,1.8vw,13px) monospace;touch-action:manipulation}
+button:active{background:#62405d}
+#message{max-width:960px;margin:auto;padding:9px;font-size:12px;min-height:37px;color:#d8c5d8}
+#hint{font-size:10px;color:#8e7d9a;padding:0 10px 12px}
+@media(max-width:480px){#controls{gap:4px;padding:5px}button{min-height:46px;font-size:9px}}
 </style>
 </head>
 <body>
+<header>
 <h1>DAVID Y EL CASTILLO DE LOS GATOS</h1>
-<p>Una aventura pixel art de fantasía oscura</p>
-<canvas id="game" width="480" height="270"></canvas>
-<div class="controls">
-  <button id="left">◀ IZQUIERDA</button>
-  <button id="jump">⬆ SALTAR</button>
-  <button id="right">DERECHA ▶</button>
-  <button id="yarn">🧶 LANZAR LANA</button>
-  <button id="pet">♡ ACARICIAR</button>
+<p>Una aventura de fantasía oscura · Pixel art</p>
+</header>
+<div id="frame">
+<canvas id="game" width="960" height="540"></canvas>
 </div>
-<p id="message">David ha llegado al castillo. Explora el camino.</p>
+<div id="controls">
+<button id="left">◀ IZQUIERDA</button>
+<button id="jump">⬆ SALTAR</button>
+<button id="right">DERECHA ▶</button>
+<button id="yarn">🧶 LANZAR LANA</button>
+<button id="pet">♡ INTERACTUAR</button>
+</div>
+<div id="message">David ha llegado al castillo. Explora el camino.</div>
+<div id="hint">Explora los rincones · Busca catnip · Acaricia a los gatos</div>
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-const message = document.getElementById("message");
-
-const keys = { left:false, right:false };
-const player = {
-  x:35, y:190, w:14, h:25,
-  vx:0, vy:0, hp:100, mana:60,
-  grounded:false, facing:1
-};
-
-let frame = 0;
-let yarns = [];
-let room = 0;
-let catnip = 0;
-let boss = null;
-let cat = null;
-let benchX = 245;
-let savedRoom = 0;
-let invulnerable = 0;
-
-const rooms = [
-  {name:"Biblioteca", bg:"#292039", boss:"Sombra", color:"#17151f"},
-  {name:"Sala de transición I", bg:"#25263a"},
-  {name:"Hall del palacio", bg:"#332239", boss:"Nieve", color:"#e7e3e8"},
-  {name:"Sala de transición II", bg:"#202638"},
-  {name:"Cámara de los tapices", bg:"#302039"},
-  {name:"Sala de transición III", bg:"#25263a"},
-  {name:"Cuarto de los relojes", bg:"#282039", boss:"Calabaza", color:"#db783c"},
-  {name:"Sala de transición IV", bg:"#202638"},
-  {name:"Jardín posterior", bg:"#1e2b25"},
-  {name:"Fuente encantada", bg:"#254039"}
+"use strict";
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+ctx.imageSmoothingEnabled=false;
+ctx.scale(2,2);
+const message=document.getElementById("message");
+const W=480,H=270;
+const keys={left:false,right:false};
+let frame=0,room=0,catnip=0,yarns=[],particles=[];
+let boss=null,cat=null,companions=0,invulnerable=0;
+let won=false,cameraX=0;
+const player={x:35,y:190,w:14,h:25,vx:0,vy:0,hp:100,mana:60,grounded:true,facing:1,climbing:false,anim:0};
+const rooms=[
+{name:"Biblioteca",type:"boss",bg:"#241b30",boss:"Sombra",color:"#17151c"},
+{name:"Sala de transición I",type:"rest",bg:"#242334"},
+{name:"Hall del palacio",type:"boss",bg:"#302034",boss:"Nieve",color:"#e5e0e2"},
+{name:"Sala de transición II",type:"rest",bg:"#202636"},
+{name:"Cámara de los tapices",type:"normal",bg:"#302238"},
+{name:"Sala de transición III",type:"rest",bg:"#252333"},
+{name:"Cuarto de los relojes",type:"boss",bg:"#292033",boss:"Calabaza",color:"#cf713b"},
+{name:"Sala de transición IV",type:"rest",bg:"#202638"},
+{name:"Jardín posterior",type:"garden",bg:"#18251f"},
+{name:"Fuente encantada",type:"ending",bg:"#213a38"}
 ];
-
-function loadRoom() {
-  const r = rooms[room];
-  player.x = 35;
-  player.y = 190;
-  player.vx = player.vy = 0;
-  cat = null;
-  boss = null;
-  yarns = [];
-
-  if (r.boss) {
-    boss = {
-      x:350, y:177, w:44, h:42,
-      hp:100, name:r.boss, color:r.color,
-      stun:0, attack:0, cooldown:1.5
-    };
-  } else if (room === 1 || room === 3 ||
-             room === 5 || room === 7) {
-    cat = {x:205,y:202,w:20,h:18,petted:false};
-  } else if (room === 4) {
-    cat = {x:170,y:202,w:20,h:18,petted:false};
-  } else if (room === 8) {
-    cat = {x:355,y:199,w:28,h:22,siamese:true};
-  }
-  benchX = 245;
+let roomData={};
+function say(t){message.textContent=t}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h)}
+function text(t,x,y,size=8,c="#f1dfbc",align="left"){
+ctx.font=size+"px monospace";ctx.textAlign=align;ctx.fillStyle=c;ctx.fillText(t,x,y);ctx.textAlign="left"
 }
+function spark(x,y,color,n=6){
+for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*45,vy:-Math.random()*45,life:.4+Math.random()*.6,color})
+}
+function loadRoom(){
+const r=rooms[room];player.x=28;player.y=190;player.vx=0;player.vy=0;player.climbing=false;player.grounded=true;
+boss=null;cat=null;yarns=[];
+if(r.type==="boss")boss={x:345,y:166,w:48,h:49,hp:100,name:r.boss,color:r.color,stun:0,cooldown:1.5,attack:0};
+else if(r.type==="rest"||r.type==="normal"){
+cat={x:177,y:197,w:20,h:18,petted:false,follow:false};
+if(!roomData[room])roomData[room]={found:[]};
+}else if(r.type==="garden"){
+cat={x:340,y:197,w:24,h:20,siamese:true};
+boss={x:345,y:168,w:52,h:47,hp:100,name:"La Siamesa",color:"#c8ad91",stun:0,cooldown:.5,attack:0,awake:false};
+}
+if(r.type==="ending")say("David ha llegado a la Fuente Encantada.");
+}
+function drawBackground(r){
+rect(0,0,W,H,r.bg);
+const sky=ctx.createLinearGradient(0,0,0,185);
+sky.addColorStop(0,"#151423");sky.addColorStop(.65,room===8?"#293d39":"#4b3448");sky.addColorStop(1,r.bg);
+ctx.fillStyle=sky;ctx.fillRect(0,0,W,215);
+for(let layer=0;layer<3;layer++){
+const step=55-layer*7,offset=-(cameraX*(.08+layer*.07))%step;
+for(let x=offset-70;x<W+70;x+=step){
+const ht=55+((Math.floor(x+cameraX)+layer*19)%65+65)%65;
+rect(x,155-ht,18+layer*4,ht,["#211d30","#30243a","#403047"][layer]);
+rect(x+5,150-ht,3,ht,"#514055");rect(x+5,145-ht,4,9,"#191726");
+}}
+for(let x=-10-(cameraX*.15%85);x<W+60;x+=85){
+rect(x,50,5,140,"#514054");rect(x+34,50,5,140,"#514054");
+rect(x+4,50,30,4,"#766078");rect(x+7,68,24,55,"#1a1928");
+rect(x+10,72,18,45,room===8?"#38483f":"#342a43");
+rect(x+18,72,2,45,"#77617b");rect(x+7,91,24,2,"#77617b");
+}
+if([0,2,4,6].includes(room))drawBookshelves();
+if(room===8)drawGarden();
+else if(room===9)drawFountain();
+else drawRoomDecor();
+drawFloor(r);
+}
+function drawBookshelves(){
+for(let sx=-20-(cameraX*.35%130);sx<W+30;sx+=130){
+rect(sx,82,43,123,"#17131e");rect(sx-3,80,49,5,"#71513b");
+rect(sx,101,43,4,"#8b6344");rect(sx,137,43,4,"#8b6344");rect(sx,173,43,4,"#8b6344");
+for(let row=0;row<3;row++)for(let b=0;b<7;b++){
+const colors=["#5b3941","#7b5942","#45445f","#9a7348","#4e5867","#754c63","#aa8550"];
+const bx=sx+3+b*5.3,by=87+row*36;
+rect(bx,by,3,11+(b%3)*2,colors[(b+row)%colors.length]);rect(bx,by,3,2,"#c29b65");
+}
+rect(sx-3,200,49,5,"#8c6747");
+}
+for(let x=48;x<W;x+=145){
+rect(x,115,2,24,"#96744c");rect(x-7,130,16,3,"#b18a53");
+rect(x-5,124,3,7,"#ffe0a0");rect(x-5,121,3,3,"#ffb65c");
+rect(x+4,124,3,7,"#ffe0a0");rect(x+4,121,3,3,"#ffb65c");
+}
+}
+function drawRoomDecor(){
+if([1,3,5,7].includes(room)){
+rect(268,193,42,10,"#78543b");rect(271,190,36,5,"#b18a58");
+rect(273,203,4,12,"#543a31");rect(301,203,4,12,"#543a31");
+rect(60,199,17,13,"#5c3d31");rect(60,197,17,4,"#a37a4c");
+}else{
+rect(54,100,48,72,"#552b43");rect(59,105,38,62,"#8c594c");
+rect(72,111,12,22,"#bd9562");rect(64,145,28,3,"#d4b578");
+rect(343,108,28,62,"#644638");rect(347,111,20,20,"#d1b176");
+rect(352,116,10,10,"#34283b");rect(356,119,2,7,"#e7ce98");
+}
+}
+function drawGarden(){
+rect(350,35,44,30,"#d7c7b2");rect(356,35,35,24,"#d8d4c5");
+for(let x=66;x<390;x+=48){
+rect(x,193,5,22,"#3d5840");rect(x-7,201,12,4,"#3c6544");
+rect(x+3,204,10,4,"#3c6544");rect(x-4,187,6,6,"#b85b87");
+rect(x+3,185,6,6,"#e2a1b7");rect(x,183,4,4,"#f3c3d2");
+}
+for(const x of [75,175,275]){
+rect(x,108,31,59,"#5b496b");rect(x+4,112,23,51,"#25303a");
+rect(x+7,115,17,45,"#40504e");rect(x+14,115,2,45,"#a18a91");
+rect(x+4,135,23,2,"#a18a91");rect(x-2,106,35,4,"#927657");
+text("VENTANA",x+15,101,6,"#d4bb93","center");
+}
+}
+function drawFountain(){
+rect(145,169,190,4,"#4e6e6c");rect(169,154,142,15,"#547a78");
+rect(180,149,120,5,"#93c9bc");rect(190,143,100,6,"#4e7979");
+rect(202,137,76,6,"#a4d6c7");rect(217,127,46,10,"#4e7c7b");
+rect(227,113,26,14,"#92cfc3");rect(235,96,10,17,"#b0e5d4");
+rect(231,94,18,4,"#e3f1d2");text("FUENTE ENCANTADA",240,80,11,"#d4f0d6","center");
+}
+function drawFloor(){
+rect(0,215,W,55,"#111019");rect(0,215,W,5,room===8?"#4e6750":"#6b5147");
+for(let x=-10-(cameraX%44);x<W;x+=44){
+rect(x,221,42,2,"#453343");rect(x+5,230,2,16,"#342635");
+rect(x+20,222,2,7,"#392b3a");rect(x+2,248,37,2,"#28202d");
+rect(x+8,224,3,2,"#766054");rect(x+30,240,4,2,"#57434d");
+if(room!==8){rect(x,216,7,2,"#6e7555");rect(x+5,214,4,2,"#68734e")}
+}
+}
+</script>
+
+function drawCat(x,y,color,scale=1,angry=false,siamese=false){
+ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.scale(scale,scale);
+rect(14,10,5,3,color);rect(18,7,4,3,color);rect(20,4,3,4,color);
+rect(4,8,13,8,color);rect(5,14,3,5,"#28212d");rect(13,14,3,5,"#28212d");
+rect(2,3,12,10,color);rect(2,0,4,6,color);rect(10,0,4,6,color);
+rect(3,2,2,3,siamese?"#b48a77":"#aa777f");
+rect(11,2,2,3,siamese?"#b48a77":"#aa777f");
+rect(4,6,2,2,angry?"#ff454c":"#e7d4ac");
+rect(10,6,2,2,angry?"#ff454c":"#e7d4ac");
+rect(7,9,2,1,"#d9a4b0");
+if(siamese){
+rect(3,3,3,8,"#d7bca1");rect(10,3,3,8,"#d7bca1");
+rect(5,8,7,5,"#493847");
+}
+if(!angry)rect(6,11,5,1,"#dfb3c0");
+ctx.restore();
+}
+
+function drawPlayer(){
+const x=Math.round(player.x),y=Math.round(player.y);
+const step=Math.sin(player.anim)*1.5;
+// Capa
+rect(x-3,y+8+step,6,13,"#542d49");
+rect(x-5,y+13+step,7,8,"#39233e");
+rect(x-4,y+19,9,4,"#2a2036");
+// Piernas y botas
+rect(x+2,y+17+step,4,7,"#55404b");
+rect(x+8,y+17-step,4,7,"#55404b");
+rect(x+1,y+23+step,5,2,"#b48a57");
+rect(x+8,y+23-step,5,2,"#b48a57");
+// Torso
+rect(x+2,y+7,10,12,"#33485a");
+rect(x+3,y+9,8,8,"#49657a");
+rect(x+2,y+16,11,2,"#a77b49");
+rect(x+7,y+15,2,3,"#e4c16f");
+// Rostro
+rect(x+4,y+4,6,5,"#d5a37f");
+rect(x+2,y+2,10,7,"#b98161");
+rect(x+3,y+5,8,3,"#d9a887");
+rect(x+9,y+6,2,2,"#171521");
+// Cabello café medio, rizado
+const hair="#76503b",light="#a77750",shadow="#493128";
+rect(x+2,y,9,4,hair);
+rect(x+1,y+1,3,4,hair);
+rect(x+4,y-2,4,4,light);
+rect(x+7,y-1,4,4,hair);
+rect(x+10,y+1,3,3,hair);
+rect(x+1,y+3,3,3,shadow);
+rect(x+4,y+2,3,2,light);
+rect(x+7,y+2,3,2,hair);
+rect(x+10,y+3,2,3,shadow);
+// Reflejo en la ropa
+rect(x+5,y+10,2,5,"#a4a8a4");
+}
+
+function drawBoss(){
+if(!boss)return;
+const b=boss;
+if(b.stun>0){
+drawCat(b.x,b.y,b.color,2.1,false,b.name==="La Siamesa");
+text("♡",b.x+15,b.y-9,13,"#ffbddf");
+return;
+}
+const scale=b.name==="La Siamesa"?1.75:2;
+ctx.save();ctx.translate(b.x,b.y);ctx.scale(scale,scale);
+// Cola
+rect(13,12,9,5,b.color);rect(19,8,6,5,b.color);rect(23,4,5,5,b.color);
+// Cuerpo imponente
+rect(4,10,15,12,b.color);rect(7,18,5,5,b.color);
+rect(15,18,5,5,b.color);rect(3,8,17,7,b.color);
+// Cabeza y orejas
+rect(2,2,15,12,b.color);rect(2,0,5,6,b.color);
+rect(13,0,5,6,b.color);
+rect(4,3,3,4,boss.name==="Nieve"?"#c4b8c8":"#704957");
+rect(13,3,3,4,boss.name==="Nieve"?"#c4b8c8":"#704957");
+// Ojos agresivos y hocico
+rect(4,7,4,2,"#ff4e61");rect(12,7,4,2,"#ff4e61");
+rect(8,10,3,2,"#e9b1bc");
+// Garras
+rect(4,21,4,3,"#e0c9b2");rect(14,21,4,3,"#e0c9b2");
+if(b.name==="Calabaza"){
+rect(4,4,4,2,"#f4ae5d");rect(13,4,3,2,"#f4ae5d");
+}
+if(b.name==="La Siamesa"){
+rect(4,2,3,9,"#e2c8aa");rect(13,2,3,9,"#e2c8aa");
+rect(6,9,8,6,"#493646");
+}
+ctx.restore();
+}
+
+function drawYarn(){
+for(const y of yarns){
+rect(y.x,y.y,7,5,"#d68bc7");
+rect(y.x+2,y.y-2,4,3,"#f1b6df");
+rect(y.x+3,y.y+2,2,2,"#fff0f7");
+}
+}
+
+function drawCatnip(){
+const data=roomData[room];
+if(!data)return;
+for(const x of [83,388]){
+if(data.found.includes(x))continue;
+rect(x,198,8,10,"#496b4b");
+rect(x+1,196,6,3,"#85a36b");
+rect(x+2,201,4,5,"#a5bd83");
+rect(x+3,203,2,2,"#d4d7a1");
+rect(x+1,208,6,2,"#72533d");
+}
+}
+
+function drawHUD(){
+rect(7,7,116,29,"#100c17");
+rect(9,9,112,25,"#342339");
+rect(10,10,110,2,"#a17b4f");
+rect(10,32,110,2,"#a17b4f");
+text("VIDA",14,17,6,"#f3dcb7");
+rect(38,12,77,6,"#08070d");
+rect(39,13,75*player.hp/100,4,
+player.hp<30?"#ed4751":"#c95870");
+text("MANÁ",14,28,6,"#d7c4f5");
+rect(38,23,77,6,"#08070d");
+rect(39,24,75*player.mana/100,4,"#716bd3");
+// Nombre de la sala
+rect(151,7,178,19,"#17111f");
+rect(153,9,174,2,"#a17b4f");
+text(rooms[room].name.toUpperCase(),240,20,8,"#f0d49a","center");
+// Catnip disponible
+rect(376,7,97,19,"#17111f");
+rect(378,9,93,2,"#a17b4f");
+text("CATNIP: "+catnip,383,20,8,"#d5bd94");
+// Barra de vida del jefe
+if(boss){
+rect(285,32,180,9,"#08070d");
+rect(287,34,176*(boss.hp/100),5,"#b94765");
+text(boss.name.toUpperCase(),375,30,7,"#f4dcb0","center");
+}
+}
+
+function draw(){
+const r=rooms[room];
+drawBackground(r);
+if([1,3,5,7].includes(room))drawCatnip();
+if(cat)drawCat(cat.x,cat.y,cat.siamese?"#d2b49b":"#17151e",1,false,!!cat.siamese);
+if(boss)drawBoss();
+if(r.type==="rest"){
+rect(268,193,42,10,"#78543b");
+rect(271,190,36,5,"#b18a58");
+text("GUARDAR",289,185,6,"#e5c894","center");
+}
+drawYarn();
+drawPlayer();
+if(cat&&cat.follow)text("♥",cat.x+6,cat.y-7,10,"#ffb6d4");
+drawHUD();
+}
+
+function throwYarn(){
+if(won)return;
+if(player.mana<12){
+say("No tienes maná. Acaricia un gato para recuperarlo.");
+return;
+}
+player.mana-=12;
+yarns.push({x:player.x+7,y:player.y+10,
+vx:player.facing*175,life:1.5});
+spark(player.x+7,player.y+10,"#dc9cda",4);
+}
+
+function petNearby(){
+if(won)return;
+const r=rooms[room];
+
+// Acariciar a un jefe transformado.
+if(boss&&boss.stun>0&&Math.abs(player.x-boss.x)<47){
+if(boss.name==="La Siamesa"){
+say("La Siamesa es imbatible. Escapa por los ventanales.");
+return;
+}
+const name=boss.name;
+spark(boss.x,boss.y,"#ffc4e8",15);
+companions++;
+player.hp=Math.min(100,player.hp+15);
+player.mana=Math.min(100,player.mana+20);
+boss=null;
+say(name+" confía en David y se une a la travesía.");
+advanceRoom();
+return;
+}
+
+// Gatos amistosos.
+if(cat&&!cat.siamese&&Math.abs(player.x-cat.x)<35){
+if(!cat.petted){
+cat.petted=true;
+cat.follow=true;
+companions++;
+player.hp=Math.min(100,player.hp+30);
+player.mana=Math.min(100,player.mana+35);
+say("¡Ronroneo! +30 vida y +35 maná. El gato te acompaña.");
+spark(cat.x,cat.y,"#f3c1df",9);
+}else{
+player.mana=Math.min(100,player.mana+8);
+say("El gato ronronea. +8 maná.");
+}
+return;
+}
+
+// Ventanales del jardín.
+if(r.type==="garden"){
+const windows=[75,175,275];
+let closest=windows[0];
+for(const x of windows){
+if(Math.abs(player.x-x)<Math.abs(player.x-closest))closest=x;
+}
+if(Math.abs(player.x-closest)<34){
+player.climbing=!player.climbing;
+if(player.climbing){
+player.y=135;
+player.vy=0;
+player.grounded=false;
+say("Te cuelgas del ventanal. Avanza por encima de las rosas.");
+}else{
+player.y=190;
+player.grounded=true;
+say("Has bajado del ventanal.");
+}
+return;
+}
+}
+
+// Bolsas de catnip escondidas.
+if(roomData[room]){
+const data=roomData[room];
+for(const x of [83,388]){
+if(!data.found.includes(x)&&Math.abs(player.x-x)<24&&player.y>170){
+data.found.push(x);
+catnip++;
+say("¡Encontraste catnip! Total: "+catnip);
+spark(x,200,"#b7d58e",9);
+return;
+}
+}
+}
+
+// Guardar en la banca.
+if(r.type==="rest"&&Math.abs(player.x-289)<42){
+try{
+localStorage.setItem("davidCastleSave",JSON.stringify({
+room:room,hp:player.hp,mana:player.mana,
+catnip:catnip,companions:companions
+}));
+say("Progreso guardado en la banca.");
+}catch(e){
+say("No se pudo guardar en este navegador.");
+}
+return;
+}
+
+// Utilizar catnip contra un jefe.
+if(boss&&Math.abs(player.x-boss.x)<100){
+if(catnip>0){
+catnip--;
+boss.hp=Math.max(0,boss.hp-15);
+spark(boss.x,boss.y,"#c9df91",10);
+say("¡Catnip! El jefe pierde 15% de vida.");
+if(boss.hp<=0){
+const name=boss.name;
+boss=null;
+companions++;
+say(name+" se rinde y se une a David.");
+advanceRoom();
+}
+}else{
+say("No tienes catnip. Busca bolsas escondidas en las salas.");
+}
+return;
+}
+
+if(r.type==="ending"){
+won=true;
+say("¡David ha llegado a la Fuente Encantada!");
+return;
+}
+say("Explora la sala y busca objetos ocultos.");
+}
+
+function advanceRoom(){
+if(room<9){
+room++;
 loadRoom();
-
-function rect(x,y,w,h,color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(Math.round(x),Math.round(y),w,h);
+if(room===9){
+won=true;
+say("¡Has llegado a la Fuente Encantada!");
+}
+}
 }
 
-function drawCat(x,y,color,scale=1,angry=false) {
-  rect(x+3*scale,y+7*scale,12*scale,9*scale,color);
-  rect(x+1*scale,y+2*scale,15*scale,10*scale,color);
-  rect(x+2*scale,y,5*scale,6*scale,color);
-  rect(x+10*scale,y,5*scale,6*scale,color);
-  rect(x+4*scale,y+5*scale,2*scale,2*scale,
-       angry ? "#ff5555" : "#f7e8c8");
-  rect(x+11*scale,y+5*scale,2*scale,2*scale,
-       angry ? "#ff5555" : "#f7e8c8");
-  rect(x+5*scale,y+15*scale,3*scale,4*scale,color);
-  rect(x+12*scale,y+15*scale,3*scale,4*scale,color);
-  rect(x+14*scale,y+10*scale,5*scale,2*scale,color);
+function update(dt){
+if(won)return;
+frame++;
+player.anim+=dt*9;
+
+// Movimiento horizontal.
+player.vx=keys.left?-100:keys.right?100:0;
+if(keys.left)player.facing=-1;
+if(keys.right)player.facing=1;
+player.x=clamp(player.x+player.vx*dt,0,466);
+
+// Gravedad y salto.
+if(!player.climbing){
+player.vy+=430*dt;
+player.y+=player.vy*dt;
+if(player.y>=190){
+player.y=190;
+player.vy=0;
+player.grounded=true;
+}else{
+player.grounded=false;
+}
+}else{
+player.y=135;
+player.vy=0;
 }
 
-function drawPlayer() {
-  rect(player.x+2,player.y+6,10,12,"#4c8295");
-  rect(player.x+2,player.y,11,9,"#e5c3a1");
-  rect(player.x+1,player.y,13,4,"#382d48");
-  rect(player.x+4,player.y+9,2,2,"#17151f");
-  rect(player.x+9,player.y+9,2,2,"#17151f");
-  rect(player.x+2,player.y+18,4,7,"#79527d");
-  rect(player.x+9,player.y+18,4,7,"#79527d");
+// Comportamiento de los jefes.
+if(boss){
+if(boss.stun>0){
+boss.stun=Math.max(0,boss.stun-dt);
+}else if(boss.name!=="La Siamesa"){
+boss.x+=Math.sign(player.x-boss.x)*28*dt;
+boss.x=clamp(boss.x,185,435);
+boss.cooldown-=dt;
+
+if(boss.cooldown<=0){
+boss.attack=.4;
+boss.cooldown=1.7;
+spark(boss.x,boss.y,"#e8a2bd",4);
+}
+if(boss.attack>0){
+boss.attack-=dt;
+if(Math.abs(player.x-boss.x)<34&&
+Math.abs(player.y-boss.y)<45&&invulnerable<=0){
+player.hp=Math.max(0,player.hp-15);
+invulnerable=1;
+say("¡Zarpazo! -15% de vida.");
+}
+}
 }
 
-function draw() {
-  const r = rooms[room];
-  rect(0,0,480,270,r.bg);
-  for(let x=0;x<480;x+=48) {
-    rect(x,35,2,150,"#49354f");
-    rect(x+2,35,40,2,"#49354f");
-    rect(x+4,70,34,2,"#49354f");
-  }
-  rect(0,215,480,55,"#15101c");
-  rect(0,215,480,4,"#806181");
-
-  for(let x=20;x<480;x+=75) {
-    rect(x,55,25,45,"#17172c");
-    rect(x+11,55,2,45,"#79617f");
-    rect(x,76,25,2,"#79617f");
-  }
-
-  rect(8,8,110,8,"#08070d");
-  rect(9,9,108*player.hp/100,6,
-       player.hp<30 ? "#ed4545" : "#bd697a");
-  rect(8,21,110,6,"#08070d");
-  rect(9,22,108*player.mana/100,4,"#8980df");
-
-  ctx.fillStyle="#e9c77b";
-  ctx.font="9px monospace";
-  ctx.fillText(r.name.toUpperCase(),130,17);
-  ctx.fillText("CATNIP: "+catnip,390,17);
-
-  if(room===8) {
-    for(let x=100;x<350;x+=48) {
-      rect(x,207,25,8,"#38543a");
-      rect(x+6,202,6,7,"#c95786");
-      rect(x+12,204,5,5,"#e7a0ba");
-    }
-    for(let x=60;x<300;x+=95) {
-      rect(x,115,28,45,"#5c4969");
-      rect(x+4,119,20,37,"#29384c");
-    }
-  }
-
-  if(room===1 || room===3 || room===5 || room===7) {
-    rect(280,204,48,8,"#a17b55");
-    rect(284,212,4,8,"#67452f");
-    rect(320,212,4,8,"#67452f");
-  }
-
-  if(cat) drawCat(cat.x,cat.y,
-    cat.siamese ? "#d9bda0" : "#17151f",
-    cat.siamese ? 1.2 : 1,false);
-
-  if(boss) {
-    if(boss.stun>0) {
-      drawCat(boss.x,boss.y,boss.color,2,false);
-      ctx.fillStyle="#ffc8df";
-      ctx.fillText("♡",boss.x+15,boss.y-8);
-    } else {
-      rect(boss.x+5,boss.y+13,boss.w-10,28,boss.color);
-      rect(boss.x,boss.y+3,boss.w,25,boss.color);
-      rect(boss.x+4,boss.y-5,11,14,boss.color);
-      rect(boss.x+29,boss.y-5,11,14,boss.color);
-      rect(boss.x+8,boss.y+12,5,4,"#ff5555");
-      rect(boss.x+29,boss.y+12,5,4,"#ff5555");
-    }
-    rect(280,28,185,7,"#08070d");
-    rect(281,29,183*boss.hp/100,5,"#b84c76");
-    ctx.fillStyle="#f4e9d0";
-    ctx.fillText(boss.name,350,24);
-  }
-
-  for(const y of yarns) {
-    rect(y.x,y.y,6,6,"#e9a8dc");
-    rect(y.x+2,y.y+2,2,2,"#fff0f7");
-  }
-  drawPlayer();
-
-  if(room===9) {
-    rect(185,150,110,12,"#528b9a");
-    rect(200,140,80,10,"#87c7c7");
-    rect(220,124,40,16,"#528b9a");
-    ctx.fillStyle="#d2f2d8";
-    ctx.font="15px monospace";
-    ctx.fillText("FUENTE ENCANTADA",240,90);
-  }
+// Impacto de la madeja.
+for(const y of yarns){
+if(Math.abs(y.x-(boss.x+boss.w/2))<26&&
+Math.abs(y.y-(boss.y+boss.h/2))<28&&boss.stun<=0){
+y.life=0;
+boss.stun=2;
+boss.attack=0;
+say("¡El gato vuelve a su forma tierna durante 2 segundos! Acércate y acarícialo.");
+spark(boss.x,boss.y,"#e8b5df",12);
+}
+}
 }
 
-function throwYarn() {
-  if(player.mana<12) {
-    message.textContent="No tienes maná. Acaricia un gato para recargar.";
-    return;
-  }
-  player.mana-=12;
-  yarns.push({
-    x:player.x+player.w/2,
-    y:player.y+10,
-    vx:player.facing*180,
-    life:1.5
-  });
+// Actualizar madejas.
+for(const y of yarns){
+y.x+=y.vx*dt;
+y.life-=dt;
+}
+yarns=yarns.filter(y=>y.life>0&&y.x>-10&&y.x<W+10);
+invulnerable=Math.max(0,invulnerable-dt);
+
+// La Siamesa despierta al pisar las rosas.
+if(room===8&&boss&&!player.climbing&&
+player.x>95&&player.x<340&&player.y>=185){
+if(!boss.awake){
+boss.awake=true;
+say("¡Las rosas crujen! La Siamesa despierta. ¡Busca un ventanal!");
+}
+}
+if(room===8&&boss&&boss.awake&&
+Math.abs(player.x-boss.x)<53&&!player.climbing){
+player.hp=0;
+say("¡Un zarpazo! La Siamesa es imbatible.");
 }
 
-function petNearby() {
-  if(cat && Math.abs(player.x-cat.x)<35) {
-    if(cat.siamese) {
-      message.textContent="¡No te acerques! Busca los ventanales.";
-      return;
-    }
-    if(!cat.petted) {
-      cat.petted=true;
-      player.hp=Math.min(100,player.hp+30);
-      player.mana=Math.min(100,player.mana+35);
-      message.textContent="¡Ronroneo! +30 vida y +35 maná.";
-    } else {
-      message.textContent="Este gato ya recibió tus caricias.";
-    }
-    return;
-  }
-
-  if(boss && boss.stun>0 &&
-     Math.abs(player.x-boss.x)<55) {
-    player.hp=Math.min(100,player.hp+30);
-    player.mana=Math.min(100,player.mana+35);
-    message.textContent="¡Has ganado la confianza de "+boss.name+"!";
-    boss=null;
-    player.x=35;
-    room++;
-    loadRoom();
-    return;
-  }
-
-  if(room===8) {
-    if(Math.abs(player.x-70)<35 ||
-       Math.abs(player.x-165)<35 ||
-       Math.abs(player.x-260)<35) {
-      player.y=125;
-      message.textContent="Te cuelgas del ventanal. ¡Avanza con cuidado!";
-    } else if(player.y<180) {
-      player.y=190;
-      message.textContent="Has bajado del ventanal.";
-    } else {
-      message.textContent="Busca los ventanales para evitar las rosas.";
-    }
-    return;
-  }
-
-  if(boss && Math.abs(player.x-boss.x)<110) {
-    if(catnip>0) {
-      catnip--;
-      boss.hp=Math.max(0,boss.hp-15);
-      message.textContent="¡Catnip! El jefe pierde 15% de vida.";
-      if(boss.hp<=0) {
-        boss=null;
-        room++;
-        loadRoom();
-      }
-    } else {
-      message.textContent="Busca bolsas de catnip en las salas.";
-    }
-    return;
-  }
-
-  if(room===1 || room===3 || room===5 || room===7) {
-    if(Math.abs(player.x-280)<45) {
-      player.hp=100;
-      player.mana=100;
-      savedRoom=room;
-      try {
-        localStorage.setItem("davidCastillo",
-          JSON.stringify({room,hp:player.hp,mana:player.mana,catnip}));
-        message.textContent="Progreso guardado en la banca.";
-      } catch(e) {
-        message.textContent="La banca está lista para guardar.";
-      }
-      return;
-    }
-  }
-  message.textContent="Explora la sala para encontrar objetos.";
+// Pasar de sala.
+if(player.x>463){
+if(room===8&&!player.climbing){
+player.x=435;
+say("Las rosas bloquean el camino. Utiliza los ventanales.");
+}else{
+advanceRoom();
+}
 }
 
-function update(dt) {
-  player.vx=keys.left?-100:keys.right?100:0;
-  if(keys.left)player.facing=-1;
-  if(keys.right)player.facing=1;
-  player.x+=player.vx*dt;
-  player.x=Math.max(0,Math.min(466,player.x));
-  player.vy+=420*dt;
-  player.y+=player.vy*dt;
-  if(player.y>190) {
-    player.y=190;
-    player.vy=0;
-    player.grounded=true;
-  }
-
-  if(boss) {
-    if(boss.stun>0) boss.stun=Math.max(0,boss.stun-dt);
-    else {
-      boss.x+=Math.sign(player.x-boss.x)*35*dt;
-      boss.x=Math.max(180,Math.min(430,boss.x));
-      boss.cooldown-=dt;
-      if(boss.cooldown<=0) {
-        boss.attack=.35;
-        boss.cooldown=1.8;
-      }
-      if(boss.attack>0) {
-        boss.attack-=dt;
-        if(Math.abs(player.x-boss.x)<35 &&
-           Math.abs(player.y-boss.y)<45 &&
-           invulnerable<=0) {
-          player.hp=Math.max(0,player.hp-15);
-          invulnerable=1;
-          message.textContent="¡Zarpazo! -15% de vida.";
-        }
-      }
-    }
-
-    for(const y of yarns) {
-      if(Math.abs(y.x-boss.x-boss.w/2)<24 &&
-         Math.abs(y.y-boss.y-boss.h/2)<25) {
-        y.life=0;
-        boss.stun=2;
-        boss.attack=0;
-        message.textContent="¡Gato tierno por 2 segundos! Acércate y acarícialo.";
-      }
-    }
-  }
-
-  for(const y of yarns) {
-    y.x+=y.vx*dt;
-    y.life-=dt;
-  }
-  yarns=yarns.filter(y=>y.life>0&&y.x>-5&&y.x<485);
-  invulnerable=Math.max(0,invulnerable-dt);
-
-  if(room===8 && !cat && !boss) {
-    cat={x:355,y:199,w:28,h:22,siamese:true};
-  }
-  if(room===8 && player.x>95 && player.x<340 &&
-     player.y>=185 && cat && !boss) {
-    boss={x:350,y:175,w:55,h:45,hp:100,name:"La Siamesa",
-      color:"#d9bda0",stun:0,cooldown:.2,attack:0};
-    message.textContent="¡Las rosas crujen! ¡La Siamesa despierta!";
-  }
-  if(boss && boss.name==="La Siamesa" &&
-     Math.abs(player.x-boss.x)<60 && invulnerable<=0) {
-    player.hp=0;
-    invulnerable=1;
-    message.textContent="¡Un zarpazo! La Siamesa es imbatible.";
-  }
-
-  if(player.x>463 && room<9) {
-    if(room===8 && player.y>180) {
-      player.x=435;
-      message.textContent="¡Evita las rosas! Busca un ventanal.";
-    } else {
-      room++;
-      loadRoom();
-    }
-  }
-  if(player.hp<=0) {
-    player.hp=100;
-    player.x=35;
-    player.y=190;
-    loadRoom();
-    message.textContent="David vuelve al inicio de la sala.";
-  }
+// Recuperación tras perder toda la vida.
+if(player.hp<=0){
+player.hp=100;
+player.mana=60;
+player.x=28;
+player.y=190;
+player.climbing=false;
+loadRoom();
+say("David vuelve al inicio de la sala. ¡Inténtalo de nuevo!");
 }
 
-let last=0;
-function loop(t) {
-  const dt=Math.min(.033,(t-last)/1000||0);
-  last=t;
-  update(dt);
-  draw();
-  requestAnimationFrame(loop);
+// Seguir a David.
+if(cat&&cat.follow){
+cat.x=clamp(player.x-24,0,460);
+cat.y=197;
+}
+
+// Partículas.
+for(const p of particles){
+p.x+=p.vx*dt;
+p.y+=p.vy*dt;
+p.life-=dt;
+}
+particles=particles.filter(p=>p.life>0);
+}
+
+function loop(t){
+const dt=Math.min(.033,(t-(loop.last||t))/1000);
+loop.last=t;
+update(dt);
+draw();
+
+if(won){
+rect(65,91,350,83,"#17111f");
+rect(68,94,344,77,"#4c3a4a");
+text("LA FUENTE ENCANTADA",240,116,13,"#efd69b","center");
+text("LA AVENTURA HA TERMINADO",240,137,9,"#f4e9d0","center");
+text("Recarga la página para volver a jugar",240,154,7,"#c9b8c9","center");
+}
+requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-document.getElementById("left").addEventListener("pointerdown",e=>{e.preventDefault();keys.left=true;});
-document.getElementById("left").addEventListener("pointerup",()=>keys.left=false);
-document.getElementById("left").addEventListener("pointerleave",()=>keys.left=false);
-document.getElementById("right").addEventListener("pointerdown",e=>{e.preventDefault();keys.right=true;});
-document.getElementById("right").addEventListener("pointerup",()=>keys.right=false);
-document.getElementById("right").addEventListener("pointerleave",()=>keys.right=false);
-document.getElementById("jump").addEventListener("pointerdown",e=>{
-  e.preventDefault();
-  if(player.grounded){player.vy=-190;player.grounded=false;}
+// Controles táctiles: mantener pulsado para caminar.
+function hold(id,key){
+const el=document.getElementById(id);
+el.addEventListener("pointerdown",e=>{
+e.preventDefault();
+keys[key]=true;
+try{el.setPointerCapture(e.pointerId)}catch(_){}
 });
-document.getElementById("yarn").addEventListener("click",throwYarn);
-document.getElementById("pet").addEventListener("click",petNearby);
+const release=()=>{keys[key]=false};
+el.addEventListener("pointerup",release);
+el.addEventListener("pointercancel",release);
+el.addEventListener("lostpointercapture",release);
+}
+hold("left","left");
+hold("right","right");
 
+// Saltar o bajar de un ventanal.
+document.getElementById("jump").addEventListener("pointerdown",e=>{
+e.preventDefault();
+if(player.climbing){
+player.climbing=false;
+player.y=190;
+player.vy=0;
+return;
+}
+if(player.grounded){
+player.vy=-190;
+player.grounded=false;
+}
+});
+
+// Lanzar lana e interactuar.
+document.getElementById("yarn").addEventListener("pointerdown",e=>{
+e.preventDefault();
+throwYarn();
+});
+document.getElementById("pet").addEventListener("pointerdown",e=>{
+e.preventDefault();
+petNearby();
+});
+
+// Teclado para probar en ordenador.
 window.addEventListener("keydown",e=>{
-  if(e.key==="ArrowLeft"||e.key==="a")keys.left=true;
-  if(e.key==="ArrowRight"||e.key==="d")keys.right=true;
-  if(e.key===" "&&player.grounded){player.vy=-190;player.grounded=false;}
-  if(e.key==="j")throwYarn();
-  if(e.key==="e")petNearby();
+if(["ArrowLeft","ArrowRight"," ","ArrowUp"].includes(e.key)){
+e.preventDefault();
+}
+if(e.key==="ArrowLeft"||e.key==="a")keys.left=true;
+if(e.key==="ArrowRight"||e.key==="d")keys.right=true;
+if((e.key===" "||e.key==="ArrowUp")&&player.grounded){
+player.vy=-190;
+player.grounded=false;
+}
+if(e.key==="j")throwYarn();
+if(e.key==="e")petNearby();
 });
+
 window.addEventListener("keyup",e=>{
-  if(e.key==="ArrowLeft"||e.key==="a")keys.left=false;
-  if(e.key==="ArrowRight"||e.key==="d")keys.right=false;
+if(e.key==="ArrowLeft"||e.key==="a")keys.left=false;
+if(e.key==="ArrowRight"||e.key==="d")keys.right=false;
 });
+
+// Recuperar partida guardada en el mismo navegador.
+try{
+const saved=JSON.parse(
+localStorage.getItem("davidCastleSave")||"null"
+);
+if(saved&&Number.isInteger(saved.room)&&saved.room>=0&&saved.room<9){
+room=saved.room;
+player.hp=clamp(saved.hp||100,1,100);
+player.mana=clamp(saved.mana||60,0,100);
+catnip=Math.max(0,saved.catnip||0);
+companions=Math.max(0,saved.companions||0);
+loadRoom();
+say("Partida recuperada desde la banca.");
+}
+}catch(e){
+say("Puedes empezar una nueva aventura.");
+}
 </script>
 </body>
 </html>
