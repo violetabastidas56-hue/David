@@ -1,0 +1,451 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>David y el Castillo de los Gatos</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #100d18;
+  color: #f4e9d0;
+  font-family: monospace;
+  text-align: center;
+}
+h1 { color: #e9c77b; font-size: 22px; }
+#game {
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  margin: auto;
+  background: #21182b;
+  image-rendering: pixelated;
+  border: 3px solid #8b6c91;
+  touch-action: none;
+}
+.controls {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+}
+button {
+  background: #382844;
+  border: 2px solid #e9c77b;
+  color: white;
+  padding: 14px;
+  font: bold 15px monospace;
+  border-radius: 5px;
+  touch-action: manipulation;
+}
+p { color: #c7b8d3; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>DAVID Y EL CASTILLO DE LOS GATOS</h1>
+<p>Una aventura pixel art de fantasía oscura</p>
+<canvas id="game" width="480" height="270"></canvas>
+<div class="controls">
+  <button id="left">◀ IZQUIERDA</button>
+  <button id="jump">⬆ SALTAR</button>
+  <button id="right">DERECHA ▶</button>
+  <button id="yarn">🧶 LANZAR LANA</button>
+  <button id="pet">♡ ACARICIAR</button>
+</div>
+<p id="message">David ha llegado al castillo. Explora el camino.</p>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const message = document.getElementById("message");
+
+const keys = { left:false, right:false };
+const player = {
+  x:35, y:190, w:14, h:25,
+  vx:0, vy:0, hp:100, mana:60,
+  grounded:false, facing:1
+};
+
+let frame = 0;
+let yarns = [];
+let room = 0;
+let catnip = 0;
+let boss = null;
+let cat = null;
+let benchX = 245;
+let savedRoom = 0;
+let invulnerable = 0;
+
+const rooms = [
+  {name:"Biblioteca", bg:"#292039", boss:"Sombra", color:"#17151f"},
+  {name:"Sala de transición I", bg:"#25263a"},
+  {name:"Hall del palacio", bg:"#332239", boss:"Nieve", color:"#e7e3e8"},
+  {name:"Sala de transición II", bg:"#202638"},
+  {name:"Cámara de los tapices", bg:"#302039"},
+  {name:"Sala de transición III", bg:"#25263a"},
+  {name:"Cuarto de los relojes", bg:"#282039", boss:"Calabaza", color:"#db783c"},
+  {name:"Sala de transición IV", bg:"#202638"},
+  {name:"Jardín posterior", bg:"#1e2b25"},
+  {name:"Fuente encantada", bg:"#254039"}
+];
+
+function loadRoom() {
+  const r = rooms[room];
+  player.x = 35;
+  player.y = 190;
+  player.vx = player.vy = 0;
+  cat = null;
+  boss = null;
+  yarns = [];
+
+  if (r.boss) {
+    boss = {
+      x:350, y:177, w:44, h:42,
+      hp:100, name:r.boss, color:r.color,
+      stun:0, attack:0, cooldown:1.5
+    };
+  } else if (room === 1 || room === 3 ||
+             room === 5 || room === 7) {
+    cat = {x:205,y:202,w:20,h:18,petted:false};
+  } else if (room === 4) {
+    cat = {x:170,y:202,w:20,h:18,petted:false};
+  } else if (room === 8) {
+    cat = {x:355,y:199,w:28,h:22,siamese:true};
+  }
+  benchX = 245;
+}
+loadRoom();
+
+function rect(x,y,w,h,color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.round(x),Math.round(y),w,h);
+}
+
+function drawCat(x,y,color,scale=1,angry=false) {
+  rect(x+3*scale,y+7*scale,12*scale,9*scale,color);
+  rect(x+1*scale,y+2*scale,15*scale,10*scale,color);
+  rect(x+2*scale,y,5*scale,6*scale,color);
+  rect(x+10*scale,y,5*scale,6*scale,color);
+  rect(x+4*scale,y+5*scale,2*scale,2*scale,
+       angry ? "#ff5555" : "#f7e8c8");
+  rect(x+11*scale,y+5*scale,2*scale,2*scale,
+       angry ? "#ff5555" : "#f7e8c8");
+  rect(x+5*scale,y+15*scale,3*scale,4*scale,color);
+  rect(x+12*scale,y+15*scale,3*scale,4*scale,color);
+  rect(x+14*scale,y+10*scale,5*scale,2*scale,color);
+}
+
+function drawPlayer() {
+  rect(player.x+2,player.y+6,10,12,"#4c8295");
+  rect(player.x+2,player.y,11,9,"#e5c3a1");
+  rect(player.x+1,player.y,13,4,"#382d48");
+  rect(player.x+4,player.y+9,2,2,"#17151f");
+  rect(player.x+9,player.y+9,2,2,"#17151f");
+  rect(player.x+2,player.y+18,4,7,"#79527d");
+  rect(player.x+9,player.y+18,4,7,"#79527d");
+}
+
+function draw() {
+  const r = rooms[room];
+  rect(0,0,480,270,r.bg);
+  for(let x=0;x<480;x+=48) {
+    rect(x,35,2,150,"#49354f");
+    rect(x+2,35,40,2,"#49354f");
+    rect(x+4,70,34,2,"#49354f");
+  }
+  rect(0,215,480,55,"#15101c");
+  rect(0,215,480,4,"#806181");
+
+  for(let x=20;x<480;x+=75) {
+    rect(x,55,25,45,"#17172c");
+    rect(x+11,55,2,45,"#79617f");
+    rect(x,76,25,2,"#79617f");
+  }
+
+  rect(8,8,110,8,"#08070d");
+  rect(9,9,108*player.hp/100,6,
+       player.hp<30 ? "#ed4545" : "#bd697a");
+  rect(8,21,110,6,"#08070d");
+  rect(9,22,108*player.mana/100,4,"#8980df");
+
+  ctx.fillStyle="#e9c77b";
+  ctx.font="9px monospace";
+  ctx.fillText(r.name.toUpperCase(),130,17);
+  ctx.fillText("CATNIP: "+catnip,390,17);
+
+  if(room===8) {
+    for(let x=100;x<350;x+=48) {
+      rect(x,207,25,8,"#38543a");
+      rect(x+6,202,6,7,"#c95786");
+      rect(x+12,204,5,5,"#e7a0ba");
+    }
+    for(let x=60;x<300;x+=95) {
+      rect(x,115,28,45,"#5c4969");
+      rect(x+4,119,20,37,"#29384c");
+    }
+  }
+
+  if(room===1 || room===3 || room===5 || room===7) {
+    rect(280,204,48,8,"#a17b55");
+    rect(284,212,4,8,"#67452f");
+    rect(320,212,4,8,"#67452f");
+  }
+
+  if(cat) drawCat(cat.x,cat.y,
+    cat.siamese ? "#d9bda0" : "#17151f",
+    cat.siamese ? 1.2 : 1,false);
+
+  if(boss) {
+    if(boss.stun>0) {
+      drawCat(boss.x,boss.y,boss.color,2,false);
+      ctx.fillStyle="#ffc8df";
+      ctx.fillText("♡",boss.x+15,boss.y-8);
+    } else {
+      rect(boss.x+5,boss.y+13,boss.w-10,28,boss.color);
+      rect(boss.x,boss.y+3,boss.w,25,boss.color);
+      rect(boss.x+4,boss.y-5,11,14,boss.color);
+      rect(boss.x+29,boss.y-5,11,14,boss.color);
+      rect(boss.x+8,boss.y+12,5,4,"#ff5555");
+      rect(boss.x+29,boss.y+12,5,4,"#ff5555");
+    }
+    rect(280,28,185,7,"#08070d");
+    rect(281,29,183*boss.hp/100,5,"#b84c76");
+    ctx.fillStyle="#f4e9d0";
+    ctx.fillText(boss.name,350,24);
+  }
+
+  for(const y of yarns) {
+    rect(y.x,y.y,6,6,"#e9a8dc");
+    rect(y.x+2,y.y+2,2,2,"#fff0f7");
+  }
+  drawPlayer();
+
+  if(room===9) {
+    rect(185,150,110,12,"#528b9a");
+    rect(200,140,80,10,"#87c7c7");
+    rect(220,124,40,16,"#528b9a");
+    ctx.fillStyle="#d2f2d8";
+    ctx.font="15px monospace";
+    ctx.fillText("FUENTE ENCANTADA",240,90);
+  }
+}
+
+function throwYarn() {
+  if(player.mana<12) {
+    message.textContent="No tienes maná. Acaricia un gato para recargar.";
+    return;
+  }
+  player.mana-=12;
+  yarns.push({
+    x:player.x+player.w/2,
+    y:player.y+10,
+    vx:player.facing*180,
+    life:1.5
+  });
+}
+
+function petNearby() {
+  if(cat && Math.abs(player.x-cat.x)<35) {
+    if(cat.siamese) {
+      message.textContent="¡No te acerques! Busca los ventanales.";
+      return;
+    }
+    if(!cat.petted) {
+      cat.petted=true;
+      player.hp=Math.min(100,player.hp+30);
+      player.mana=Math.min(100,player.mana+35);
+      message.textContent="¡Ronroneo! +30 vida y +35 maná.";
+    } else {
+      message.textContent="Este gato ya recibió tus caricias.";
+    }
+    return;
+  }
+
+  if(boss && boss.stun>0 &&
+     Math.abs(player.x-boss.x)<55) {
+    player.hp=Math.min(100,player.hp+30);
+    player.mana=Math.min(100,player.mana+35);
+    message.textContent="¡Has ganado la confianza de "+boss.name+"!";
+    boss=null;
+    player.x=35;
+    room++;
+    loadRoom();
+    return;
+  }
+
+  if(room===8) {
+    if(Math.abs(player.x-70)<35 ||
+       Math.abs(player.x-165)<35 ||
+       Math.abs(player.x-260)<35) {
+      player.y=125;
+      message.textContent="Te cuelgas del ventanal. ¡Avanza con cuidado!";
+    } else if(player.y<180) {
+      player.y=190;
+      message.textContent="Has bajado del ventanal.";
+    } else {
+      message.textContent="Busca los ventanales para evitar las rosas.";
+    }
+    return;
+  }
+
+  if(boss && Math.abs(player.x-boss.x)<110) {
+    if(catnip>0) {
+      catnip--;
+      boss.hp=Math.max(0,boss.hp-15);
+      message.textContent="¡Catnip! El jefe pierde 15% de vida.";
+      if(boss.hp<=0) {
+        boss=null;
+        room++;
+        loadRoom();
+      }
+    } else {
+      message.textContent="Busca bolsas de catnip en las salas.";
+    }
+    return;
+  }
+
+  if(room===1 || room===3 || room===5 || room===7) {
+    if(Math.abs(player.x-280)<45) {
+      player.hp=100;
+      player.mana=100;
+      savedRoom=room;
+      try {
+        localStorage.setItem("davidCastillo",
+          JSON.stringify({room,hp:player.hp,mana:player.mana,catnip}));
+        message.textContent="Progreso guardado en la banca.";
+      } catch(e) {
+        message.textContent="La banca está lista para guardar.";
+      }
+      return;
+    }
+  }
+  message.textContent="Explora la sala para encontrar objetos.";
+}
+
+function update(dt) {
+  player.vx=keys.left?-100:keys.right?100:0;
+  if(keys.left)player.facing=-1;
+  if(keys.right)player.facing=1;
+  player.x+=player.vx*dt;
+  player.x=Math.max(0,Math.min(466,player.x));
+  player.vy+=420*dt;
+  player.y+=player.vy*dt;
+  if(player.y>190) {
+    player.y=190;
+    player.vy=0;
+    player.grounded=true;
+  }
+
+  if(boss) {
+    if(boss.stun>0) boss.stun=Math.max(0,boss.stun-dt);
+    else {
+      boss.x+=Math.sign(player.x-boss.x)*35*dt;
+      boss.x=Math.max(180,Math.min(430,boss.x));
+      boss.cooldown-=dt;
+      if(boss.cooldown<=0) {
+        boss.attack=.35;
+        boss.cooldown=1.8;
+      }
+      if(boss.attack>0) {
+        boss.attack-=dt;
+        if(Math.abs(player.x-boss.x)<35 &&
+           Math.abs(player.y-boss.y)<45 &&
+           invulnerable<=0) {
+          player.hp=Math.max(0,player.hp-15);
+          invulnerable=1;
+          message.textContent="¡Zarpazo! -15% de vida.";
+        }
+      }
+    }
+
+    for(const y of yarns) {
+      if(Math.abs(y.x-boss.x-boss.w/2)<24 &&
+         Math.abs(y.y-boss.y-boss.h/2)<25) {
+        y.life=0;
+        boss.stun=2;
+        boss.attack=0;
+        message.textContent="¡Gato tierno por 2 segundos! Acércate y acarícialo.";
+      }
+    }
+  }
+
+  for(const y of yarns) {
+    y.x+=y.vx*dt;
+    y.life-=dt;
+  }
+  yarns=yarns.filter(y=>y.life>0&&y.x>-5&&y.x<485);
+  invulnerable=Math.max(0,invulnerable-dt);
+
+  if(room===8 && !cat && !boss) {
+    cat={x:355,y:199,w:28,h:22,siamese:true};
+  }
+  if(room===8 && player.x>95 && player.x<340 &&
+     player.y>=185 && cat && !boss) {
+    boss={x:350,y:175,w:55,h:45,hp:100,name:"La Siamesa",
+      color:"#d9bda0",stun:0,cooldown:.2,attack:0};
+    message.textContent="¡Las rosas crujen! ¡La Siamesa despierta!";
+  }
+  if(boss && boss.name==="La Siamesa" &&
+     Math.abs(player.x-boss.x)<60 && invulnerable<=0) {
+    player.hp=0;
+    invulnerable=1;
+    message.textContent="¡Un zarpazo! La Siamesa es imbatible.";
+  }
+
+  if(player.x>463 && room<9) {
+    if(room===8 && player.y>180) {
+      player.x=435;
+      message.textContent="¡Evita las rosas! Busca un ventanal.";
+    } else {
+      room++;
+      loadRoom();
+    }
+  }
+  if(player.hp<=0) {
+    player.hp=100;
+    player.x=35;
+    player.y=190;
+    loadRoom();
+    message.textContent="David vuelve al inicio de la sala.";
+  }
+}
+
+let last=0;
+function loop(t) {
+  const dt=Math.min(.033,(t-last)/1000||0);
+  last=t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.getElementById("left").addEventListener("pointerdown",e=>{e.preventDefault();keys.left=true;});
+document.getElementById("left").addEventListener("pointerup",()=>keys.left=false);
+document.getElementById("left").addEventListener("pointerleave",()=>keys.left=false);
+document.getElementById("right").addEventListener("pointerdown",e=>{e.preventDefault();keys.right=true;});
+document.getElementById("right").addEventListener("pointerup",()=>keys.right=false);
+document.getElementById("right").addEventListener("pointerleave",()=>keys.right=false);
+document.getElementById("jump").addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  if(player.grounded){player.vy=-190;player.grounded=false;}
+});
+document.getElementById("yarn").addEventListener("click",throwYarn);
+document.getElementById("pet").addEventListener("click",petNearby);
+
+window.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft"||e.key==="a")keys.left=true;
+  if(e.key==="ArrowRight"||e.key==="d")keys.right=true;
+  if(e.key===" "&&player.grounded){player.vy=-190;player.grounded=false;}
+  if(e.key==="j")throwYarn();
+  if(e.key==="e")petNearby();
+});
+window.addEventListener("keyup",e=>{
+  if(e.key==="ArrowLeft"||e.key==="a")keys.left=false;
+  if(e.key==="ArrowRight"||e.key==="d")keys.right=false;
+});
+</script>
+</body>
+</html>
