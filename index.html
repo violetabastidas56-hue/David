@@ -48,7 +48,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;background:#000;dis
 <div id="ov"><h1 id="ot">David y el Castillo de los Gatos</h1>
 <p id="op">David, caballero del yelmo puntiagudo, cruza un castillo en ruinas gobernado por cuatro gatos guardianes: el Rey, la Bruja, el Guerrero y la Reina. Lanza ovillos mágicos para encantarlos y acarícialos para ganarte su amistad.</p>
 <p>Teclado: ←→ mover · Espacio saltar · J ovillo · K acariciar · H hierba gatera · L espada<br>Los guardianes dejan un cascabel: es la llave que libera a los gatos tuxedo enjaulados<br>Táctil: joystick a la izquierda (empujar hacia arriba salta) y botones de acción a la derecha (mejor en horizontal)</p>
-<div><button id="bs">Comenzar</button><button id="bc">Continuar</button></div></div>
+<div><button id="bs">Comenzar</button><button id="bc">Continuar</button><button id="bz">Misión Rescate Zeus</button></div></div>
 <script>
 "use strict";
 const W=320,H=180,KEY='david_castillo_v1';
@@ -170,12 +170,12 @@ function enter(i,fromRespawn,side){
   if(!G.inv&&S.pend>0){G.hp-=CFG.nipDmg*S.pend;S.gh[i]=G.hp;S.pend=0;say('¡La hierba gatera debilita a '+d.n+'!',2.5)}}
  if(L.safe&&S.lastSafe!==i&&!fromRespawn){S.lastSafe=i}
  if(L.safe)S.lastSafe=i;
- if(i===8)S.story=3;hintTxt=L.map?'⚔ espada contra guardianes · 🧶 ovillo contra gatos salvajes':i===6?'Sube por las escaleras hasta los ventanales · pulsa ⤒ junto al borde para trepar':'Lanza 🧶 para encantar · acerca y pulsa ✋ para acariciar';if(i===6)hintT=7;if(i===9)hintT=6;
+ if(i===8)S.story=3;hintTxt=L.map?'⚔ espada contra guardianes · 🧶 ovillo contra gatos salvajes':i===6?'Sube por las escaleras hasta los ventanales · pulsa ⤒ junto al borde para trepar':'Lanza 🧶 para encantar · acerca y pulsa ✋ para acariciar';if(i===6)hintT=7;if(i===9)hintT=6;if(L.map&&S.frags>=3&&!S.zeus){hintTxt='Tienes los tres fragmentos: busca el Umbral del Hogar y activa su portal con ✋';hintT=7}if(L.map&&S.zeus&&!S.zfree){hintTxt='Rescate Zeus: reúne cinco llaves ('+kfCount()+'/5) y rompe el sello del Santuario';hintT=5}
  if(L.shrine){const nw=ORD.filter(o=>S.def[o.lvl]&&!S.shown[o.t]).map(o=>o.t);if(nw.length){SA={t:0,nw:nw};scene='shrine';K.l=K.r=K.j=0}}
 }
 function start(s){S=s;scene='play';document.getElementById('ov').style.display='none';enter(S.lvl,1);if(S.cp&&S.cp.lvl===S.lvl)p.x=S.cp.x;updBtn();hintT=S.seen?0:9;
  if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();
- say(LV[S.lvl].n,2.5)}
+ say(LV[S.lvl].n,2.5);if(S.fin&&!S.zeus)goZeus()}
 function hurt(dm,kx){if(p.inv>0)return;S.hp=Math.max(0,S.hp-dm);p.inv=CFG.inv;p.hang=null;p.gc=.3;p.vx=kx*110;p.vy=-140;emit(p.x+5,p.y+8,8,'#e04050');beep(150,.25,'sawtooth',.06,60);
  if(S.hp<=0)die()}
 function die(){say(S.cp?'David cae... despierta en el último rascador: los enemigos regresan, los guardianes vencidos no':'David cae... despierta en un refugio',4);S.hp=CFG.hpMax;S.mana=Math.max(S.mana,50);S.mdef={};S.gh={};if(S.cp){enter(S.cp.lvl,1);p.x=S.cp.x}else enter(S.lastSafe,1)}
@@ -551,7 +551,7 @@ function portalDraw(x,tk){x=Math.round(x);R(x-24,60,6,90,'#6a7490');R(x+18,60,6,
  for(let k=0;k<S.frags;k++){const a=tk*1.6+k*2.094;ico(X,Math.round(x+Math.cos(a)*14-4),Math.round(100+Math.sin(a)*20-4),'yarn',1,GOLDP)}}
 function wrap(t,mw){const ws=t.split(' '),out=[];let l='';for(const w of ws){const n=l?l+' '+w:w;if(X.measureText(n).width>mw&&l){out.push(l);l=w}else l=n}if(l)out.push(l);return out}
 const CAP1=['Bienvenido, David, elegido de los gatos celestiales. Soy Capuchina, la Gran Sabia de estas tierras perdidas.','Hace mil años el Ovillo de Oro se rompió en tres fragmentos, y los guardianes que lo custodiaban se perdieron.','Brasa, guardián del Fuego; Escarcha, guardián del Hielo; y Relámpago, guardián del Rayo. Duermen en sus salas.','Solo despertarán ante el cascabel de su propio color: rojo, azul o amarillo. Los gatos tuxedo de estas tierras los esconden, en lo alto de las plataformas.','Con la espada celestial vence a cada guardián y recibirás un fragmento del Ovillo. A los gatos salvajes, lánzales ovillos.','En cada sala crece hierba gatera escondida entre las piedras: acércate y la sentirás.','Cuidado con los centinelas tuxedo: saltan por toda la sala. Cuando venzas a un guardián aparecerá un rascador: actívalo y tus compañeros afilarán sus garras; si caes, despertarás allí.','Lleva cada fragmento al Santuario del Ovillo Dorado: sus tres estatuas doradas y los guardianes tejerán de nuevo el ovillo.','Toma este mapa: solo marca las salas que ya hayas pisado. Cada sala tiene dos puertas y cada una lleva a una sala distinta. Solo el Santuario del Ovillo Dorado se alcanza desde el mapa por tu voluntad.'];
-function talk(){const first=!S.mapItem;let lines=CAP1;if(!first){lines=['Ve, elegido. Los guardianes perdidos esperan: cada uno despierta solo ante el cascabel de su color.','Fragmentos del Ovillo de Oro reunidos: '+S.frags+' de 3. '+(S.frags>=3?'El Umbral del Hogar te aguarda.':'Sigue buscando.')]}
+function talk(){const first=!S.mapItem;let lines=CAP1;if(!first){lines=['Ve, elegido. Los guardianes perdidos esperan: cada uno despierta solo ante el cascabel de su color.','Fragmentos del Ovillo de Oro reunidos: '+S.frags+' de 3. '+(S.frags>=3?'El Umbral del Hogar te aguarda: recorre las puertas de las salas hasta hallar su portal y actívalo con ✋.':'Sigue buscando.')]}
  if(S.zeus)lines=ZR();DL={lines:lines,i:0,cd:.3,first:first,who:'c'};scene='talk';K.l=K.r=K.j=0}
 function talkUpd(dt){if(DL.cd>0)DL.cd-=dt;if((E.p||E.j||E.y)&&DL.cd<=0){E.p=E.j=E.y=0;DL.i++;DL.cd=.25;beep(500,.05,'square',.03);if(DL.i>=DL.lines.length){scene='play';if(DL.who==='m')S.mj=1;if(DL.mz){say('Misión: Rescate Zeus · reúne cinco fragmentos de llave',6);beep(660,.5,'triangle',.07,990)}if(DL.first){S.mapItem=1;say('Capuchina te entrega el Mapa de las Tierras Perdidas',4);updBtn();beep(700,.4,'triangle',.06,1000)}DL=null;save()}}else{E.p=E.j=E.y=0}E.n=E.m=E.w=0}
 function drawDialog(){X.font='8px monospace';X.textAlign='left';frame(6,110,308,64);R(12,104,76,11,'#2a1840');X.strokeStyle='#b89a5a';X.strokeRect(12.5,104.5,75,10);X.fillStyle='#e8c040';X.fillText(DL.who==='m'?'Manjar':'Capuchina',16,113);
@@ -756,6 +756,8 @@ document.getElementById('snd').onclick=()=>{snd=!snd;document.getElementById('sn
 document.getElementById('rst').onclick=()=>{if(scene!=='play')return;if(confirm('¿Reiniciar la partida? Se borrará el progreso guardado de este juego.')){try{localStorage.removeItem(KEY)}catch(e){}K.l=K.r=K.j=0;start(newS())}};
 function showTitle(){document.getElementById('bc').style.display=load()?'inline-block':'none'}
 document.getElementById('bs').onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}document.getElementById('ov').style.background='';document.getElementById('bc').style.display='';document.getElementById('bs').textContent='Comenzar';start(newS())};
+function startZeusDirect(){const s=newS();s.sword=1;s.mapItem=1;s.frags=3;s.fin=1;s.lastSafe=9;s.lvl=9;s.comps=['rey','bruja','guerrero','reina'];s.shown={fuego:1,hielo:1,rayo:1};s.def={0:1,2:1,4:1,6:1};s.vis={9:1};document.getElementById('ov').style.background='';document.getElementById('bc').textContent='Continuar';start(s)}
+document.getElementById('bz').onclick=startZeusDirect;
 document.getElementById('bc').onclick=()=>{const s=load();document.getElementById('bc').textContent='Continuar';document.getElementById('ov').style.background='';start(s||newS())};
 S=newS();enter(0);showTitle();
 function loop(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;if(scene==='play')upd(dt);else if(scene==='end')endUpd(dt);else if(scene==='end2')endUpd2(dt);else if(scene==='end3')endUpd3(dt);else if(scene==='talk')talkUpd(dt);else if(scene==='shrine')shrineUpd(dt);else if(scene==='legend')legendUpd(dt);draw();requestAnimationFrame(loop)}
